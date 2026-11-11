@@ -100,6 +100,11 @@ h2{font-size:1.1em;font-weight:700;margin:0}
 .tile.n{background:var(--surface-2);color:var(--ink)} .tile.n span{color:var(--muted)}
 .month .tile.w{background:rgba(69,201,143,.18);color:#86E6BA}
 .month .tile.l{background:rgba(255,125,112,.2);color:#FFB4AB}
+.avgline{display:flex;justify-content:space-between;align-items:baseline;gap:10px;border-radius:16px;padding:12px 14px;background:var(--surface-2)}
+.avgline span{font-weight:700;font-size:.9em;color:var(--muted)}
+.avgline b{font-family:var(--f-num);font-size:1.8em;line-height:1;font-variant-numeric:tabular-nums}
+.month .avgline{background:rgba(255,255,255,.1)}
+.month .avgline span{color:rgba(255,255,255,.8)}
 
 .split{display:flex;height:16px;border-radius:99px;overflow:hidden;background:var(--surface-2);border:1px solid var(--line)}
 .split i{display:block;height:100%}
@@ -284,7 +289,7 @@ const MEM={};
 const ls={get(k){try{const v=localStorage.getItem(k);return v===null?(k in MEM?MEM[k]:null):v}catch(e){return k in MEM?MEM[k]:null}},set(k,v){MEM[k]=v;try{localStorage.setItem(k,v)}catch(e){}},del(k){delete MEM[k];try{localStorage.removeItem(k)}catch(e){}}};
 const ACC='tcp_cuentas',SES='tcp_sesion',BIG='tcp_letra',dKey=u=>'tcp_datos_'+u;
 
-const GCATS=['Gasoil','Taller','Lavado','Seguro','Autónomos','Otros'];
+const GCATS=['Gasoil','Abutaxi','Taller','Lavado','Seguro','Autónomos','Otros'];
 /* Festivos de Madrid capital 2026 (Comunidad + locales) y de la Comunidad de Madrid 2027 */
 const FEST_DEFAULT=[['2026-01-01','Año Nuevo'],['2026-01-06','Reyes'],['2026-04-02','Jueves Santo'],['2026-04-03','Viernes Santo'],['2026-05-01','Fiesta del Trabajo'],['2026-05-02','Comunidad de Madrid'],['2026-05-15','San Isidro'],['2026-08-15','Asunción de la Virgen'],['2026-10-12','Fiesta Nacional'],['2026-11-02','Todos los Santos'],['2026-11-09','La Almudena'],['2026-12-07','Día de la Constitución'],['2026-12-08','Inmaculada Concepción'],['2026-12-25','Navidad'],
 ['2027-01-01','Año Nuevo'],['2027-01-06','Reyes'],['2027-03-19','San José'],['2027-03-25','Jueves Santo'],['2027-03-26','Viernes Santo'],['2027-05-01','Fiesta del Trabajo'],['2027-08-16','Asunción de la Virgen'],['2027-10-12','Fiesta Nacional'],['2027-11-01','Todos los Santos'],['2027-12-06','Día de la Constitución'],['2027-12-08','Inmaculada Concepción'],['2027-12-25','Navidad']];
@@ -398,11 +403,13 @@ function vInicio(){
     ${monthSw()}
     <div><p class="lbl">Has ganado</p><p class="big">${eur(md.imp)}</p><p class="days">${md.dTrab} ${md.dTrab===1?'día trabajado':'días trabajados'} · ${md.desc} ${md.desc===1?'día':'días'} de descanso</p></div>
     <div class="pair"><div class="tile w"><span>Horas trabajadas</span><b>${n1(md.trab)}</b></div><div class="tile l"><span>Horas perdidas</span><b>${n1(md.lost)}</b></div></div>
+    <div class="avgline"><span>Media ganada por hora</span><b>${md.trab?eur(md.imp/md.trab):'—'}</b></div>
   </section>
   <section class="card">
     <h2>En ${y} llevas</h2>
     <div class="pair"><div class="tile w"><span>Trabajadas</span><b>${n1(T.trab)} h</b></div><div class="tile l"><span>Perdidas</span><b>${n1(T.lost)} h</b></div></div>
     ${tot?`<div class="split" aria-hidden="true"><i class="w" style="width:${pctW.toFixed(1)}%"></i><i class="l" style="width:${(100-pctW).toFixed(1)}%"></i></div>`:''}
+    <div class="avgline"><span>Media ganada por hora en ${y}</span><b>${T.trab?eur(T.imp/T.trab):'—'}</b></div>
     <p class="help">Cada día que puedes trabajar cuenta como ${n1(HD())} horas. Lo que no trabajas son horas perdidas. Tus días de descanso no cuentan.</p>
     <button class="btn green block" data-act="excel" data-y="${y}"><span class="ic">⬇</span>Descargar Excel ${y}</button>
   </section>
@@ -586,15 +593,15 @@ async function buildExcel(y){
 
   /* 1. Resumen del año */
   const ws=wb.addWorksheet('Resumen '+y,{views:[{state:'frozen',ySplit:5}],properties:{tabColor:{argb:C.navy}}});
-  const cols=['Mes','Días que podía trabajar','Días de descanso','Días trabajados','Horas trabajadas','Horas perdidas del mes','Horas perdidas en el año','Ganado (€)','Gastos (€)','Le queda (€)'];
-  const hc=[C.navy,C.navy,C.navy,C.navy,C.wH,C.lH,C.aH,C.mH,C.mH,C.mH];
-  top(ws,`Horas y dinero ${y}`,cols.length);head(ws,5,cols,hc);[13,13,12,12,14,14,14,14,13,14].forEach((w,i)=>ws.getColumn(i+1).width=w);
-  ms.forEach((o,i)=>{const r=6+i,row=ws.getRow(r);row.values=[cap(MESES[i]),o.lab,o.desc,o.dTrab,o.trab,o.lost,{formula:i?`G${r-1}+F${r}`:`F${r}`,result:o.acc},o.imp,o.gastos,{formula:`H${r}-I${r}`,result:o.imp-o.gastos}];
-    row.eachCell({includeEmpty:true},(c,ci)=>{c.border=bd;if(ci===1)c.font={bold:true}});[5,6,7].forEach(ci=>row.getCell(ci).numFmt=H);[8,9,10].forEach(ci=>{row.getCell(ci).numFmt=E;row.getCell(ci).fill=fill(C.m)});
+  const cols=['Mes','Días que podía trabajar','Días de descanso','Días trabajados','Horas trabajadas','Horas perdidas del mes','Horas perdidas en el año','Ganado (€)','Gastos (€)','Le queda (€)','Media ganada por hora (€)'];
+  const hc=[C.navy,C.navy,C.navy,C.navy,C.wH,C.lH,C.aH,C.mH,C.mH,C.mH,C.mH];
+  top(ws,`Horas y dinero ${y}`,cols.length);head(ws,5,cols,hc);[13,13,12,12,14,14,14,14,13,14,15].forEach((w,i)=>ws.getColumn(i+1).width=w);
+  ms.forEach((o,i)=>{const r=6+i,row=ws.getRow(r);row.values=[cap(MESES[i]),o.lab,o.desc,o.dTrab,o.trab,o.lost,{formula:i?`G${r-1}+F${r}`:`F${r}`,result:o.acc},o.imp,o.gastos,{formula:`H${r}-I${r}`,result:o.imp-o.gastos},{formula:`IF(E${r}=0,0,H${r}/E${r})`,result:o.trab?o.imp/o.trab:0}];
+    row.eachCell({includeEmpty:true},(c,ci)=>{c.border=bd;if(ci===1)c.font={bold:true}});[5,6,7].forEach(ci=>row.getCell(ci).numFmt=H);[8,9,10,11].forEach(ci=>{row.getCell(ci).numFmt=E;row.getCell(ci).fill=fill(C.m)});
     row.getCell(5).fill=fill(C.w);row.getCell(5).font={bold:true,color:{argb:C.wH}};row.getCell(6).fill=fill(C.l);row.getCell(6).font={bold:true,color:{argb:C.lH}};row.getCell(7).fill=fill(C.a);row.getCell(7).font={bold:true,color:{argb:C.aH}};row.height=22});
   const tr=ws.getRow(18),SUM=c=>`SUM(${c}6:${c}17)`;
-  tr.values=['TOTAL',{formula:SUM('B'),result:T.lab},{formula:SUM('C'),result:T.desc},{formula:SUM('D'),result:T.dTrab},{formula:SUM('E'),result:T.trab},{formula:SUM('F'),result:T.lost},{formula:'G17',result:T.lost},{formula:SUM('H'),result:T.imp},{formula:SUM('I'),result:T.gastos},{formula:'H18-I18',result:T.imp-T.gastos}];
-  totStyle(tr,hc);[5,6,7].forEach(ci=>tr.getCell(ci).numFmt=H);[8,9,10].forEach(ci=>tr.getCell(ci).numFmt=E);tr.height=26;
+  tr.values=['TOTAL',{formula:SUM('B'),result:T.lab},{formula:SUM('C'),result:T.desc},{formula:SUM('D'),result:T.dTrab},{formula:SUM('E'),result:T.trab},{formula:SUM('F'),result:T.lost},{formula:'G17',result:T.lost},{formula:SUM('H'),result:T.imp},{formula:SUM('I'),result:T.gastos},{formula:'H18-I18',result:T.imp-T.gastos},{formula:'IF(E18=0,0,H18/E18)',result:T.trab?T.imp/T.trab:0}];
+  totStyle(tr,hc);[5,6,7].forEach(ci=>tr.getCell(ci).numFmt=H);[8,9,10,11].forEach(ci=>tr.getCell(ci).numFmt=E);tr.height=26;
   ws.mergeCells(20,1,20,10);const nt=ws.getCell(20,1);nt.value=`Cómo se calcula: cada día que se puede trabajar cuenta ${n1(hd)} horas. Horas perdidas = ${n1(hd)} h menos las horas trabajadas ese día. Los días de descanso no cuentan.`;nt.font={italic:true,size:10,color:{argb:C.grayT}};nt.alignment={wrapText:true};ws.getRow(20).height=30;
   [['■ Horas trabajadas',C.w,C.wH,1,2],['■ Perdidas del mes',C.l,C.lH,3,4],['■ Perdidas en el año',C.a,C.aH,5,7],['■ Dinero',C.m,C.mH,8,10]].forEach(l=>{ws.mergeCells(22,l[3],22,l[4]);const c=ws.getCell(22,l[3]);c.value=l[0];c.fill=fill(l[1]);c.font={bold:true,color:{argb:l[2]}};c.border=bd});
 

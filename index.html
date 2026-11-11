@@ -310,6 +310,7 @@ const isWE=f=>{const d=dObj(f).getDay();return d===0||d===6};
 const dayCls=f=>festOf(f)?'fest':isWE(f)?'we':'';
 const jOf=f=>S.jornadas.find(j=>j.fecha===f);
 const HD=()=>Math.min(24,Math.max(1,P(S.settings.horasDia)||12));
+const desdeEf=()=>{let d=S.settings.desde||todayIso();S.jornadas.forEach(j=>{if(j.fecha<d)d=j.fecha});return d};
 
 function demoData(){
   const D=defaults();let seed=20261111;const r=()=>(seed=(seed*16807)%2147483647)/2147483647;
@@ -347,7 +348,7 @@ async function logout(){await flush();if(sb&&UID){try{await sb.signOut()}catch(e
 function diaInfo(f){
   const j=jOf(f),mark=S.dias[f],dow=dObj(f).getDay(),fe=festOf(f),semanal=+S.settings.descanso===dow;
   const rest=(mark&&mark.estado==='descanso')||(semanal&&!(mark&&mark.estado==='disponible'));
-  const h=j?P(j.horas):0,t=todayIso(),counts=f>=S.settings.desde&&(f<t||(f===t&&!!j));
+  const h=j?P(j.horas):0,t=todayIso(),counts=f>=desdeEf()&&(f<t||(f===t&&!!j));
   const lost=counts&&!rest?Math.max(0,HD()-h):0;
   return{f,dow,fe,j,rest,semanal,exc:semanal&&mark&&mark.estado==='disponible',h,imp:j?P(j.importe):0,counts,lost};
 }
@@ -579,7 +580,7 @@ async function buildExcel(y){
   const H='#,##0.0" h"',E='#,##0.00" €"';
   const top=(ws,title,cols)=>{ws.mergeCells(1,1,1,cols);const t=ws.getCell(1,1);t.value=title;t.font={bold:true,size:16,color:{argb:C.white}};t.fill=fill(C.navy);t.alignment={vertical:'middle',indent:1};ws.getRow(1).height=32;
     ws.mergeCells(2,1,2,cols);ws.getCell(2,1).value=[st.nombre||USER,st.licencia?'Licencia '+st.licencia:''].filter(Boolean).join('  ·  ');ws.getCell(2,1).font={bold:true,size:12};
-    ws.mergeCells(3,1,3,cols);ws.getCell(3,1).value=`Cada día que se puede trabajar = ${n1(hd)} h  ·  Descanso semanal: ${+st.descanso>=0?DOWL[+st.descanso]:'variable'}  ·  Desde: ${fCorta(st.desde)}  ·  Sacado el ${new Date().toLocaleDateString('es-ES')}`;ws.getCell(3,1).font={size:10,color:{argb:C.grayT}}};
+    ws.mergeCells(3,1,3,cols);ws.getCell(3,1).value=`Cada día que se puede trabajar = ${n1(hd)} h  ·  Descanso semanal: ${+st.descanso>=0?DOWL[+st.descanso]:'variable'}  ·  Desde: ${fCorta(desdeEf())}  ·  Sacado el ${new Date().toLocaleDateString('es-ES')}`;ws.getCell(3,1).font={size:10,color:{argb:C.grayT}}};
   const head=(ws,r,labels,colors)=>{const row=ws.getRow(r);labels.forEach((l,i)=>{const c=row.getCell(i+1);c.value=l;c.font={bold:true,color:{argb:C.white}};c.fill=fill(colors[i]||C.navy);c.alignment={horizontal:'center',vertical:'middle',wrapText:true};c.border=bd});row.height=36};
   const totStyle=(row,colors)=>row.eachCell({includeEmpty:true},(c,ci)=>{c.border=bd;c.font={bold:true,color:{argb:C.white}};c.fill=fill(colors[ci-1]||C.navy)});
 
@@ -602,7 +603,7 @@ async function buildExcel(y){
   const dc=['Fecha','Día','Tipo de día','Festivo','Horas trabajadas','Horas perdidas','Perdidas del mes (suma)','Perdidas del año (suma)','Ganado (€)'];
   const dh=[C.navy,C.navy,C.navy,C.navy,C.wH,C.lH,C.lH,C.aH,C.mH];
   top(wd,`Día a día ${y}`,dc.length);head(wd,5,dc,dh);[12,11,15,24,13,13,15,15,13].forEach((w,i)=>wd.getColumn(i+1).width=w);
-  let r=6,accY=0;const t=todayIso(),start=(y+'-01-01')>st.desde?y+'-01-01':st.desde;
+  let r=6,accY=0;const t=todayIso(),start=(y+'-01-01')>desdeEf()?y+'-01-01':desdeEf();
   ms.forEach((o,mi)=>{let accM=0,any=false;o.days.forEach(i=>{if(i.f<start||i.f>t)return;any=true;accM+=i.lost;accY+=i.lost;
       const we=i.dow===0||i.dow===6,tipo=i.rest?'Descanso':i.fe?'Festivo':we?'Fin de semana':'Laborable';
       const row=wd.getRow(r);row.values=[dObj(i.f),cap(DOWL[i.dow]),tipo,i.fe?i.fe.n:'',i.h,i.lost,accM,accY,i.j?i.imp:null];
